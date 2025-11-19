@@ -1,0 +1,36 @@
+{
+  "name": "icd11-hackathon",
+  "version": "1.0.0",
+  "description": "ICD-11 medical terminology application with OpenWebUI",
+  "main": "index.js",
+  "scripts": {
+    "dev": "node server.js",
+    "build": "webpack --mode production",
+    "build-dev": "webpack --mode development",
+    "watch": "webpack --mode development --watch",
+    "serve": "http-server dist -p 8080",
+    "test": "jest"
+  },
+  "keywords": ["icd11", "medical", "terminology", "openwebui"],
+  "author": "Espen",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "axios": "^1.6.2",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "webpack": "^5.89.0",
+    "webpack-cli": "^5.1.4",
+    "webpack-dev-server": "^4.15.1",
+    "html-webpack-plugin": "^5.5.3",
+    "css-loader": "^6.8.1",
+    "style-loader": "^3.3.3",
+    "babel-loader": "^9.1.3",
+    "@babel/core": "^7.23.5",
+    "@babel/preset-env": "^7.23.5",
+    "http-server": "^14.1.1",
+    "jest": "^29.7.0"
+  }
+}

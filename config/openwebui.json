@@ -1,0 +1,28 @@
+{
+  "name": "ICD-11 Medical Terminology",
+  "description": "OpenWebUI configuration for medical terminology application",
+  "version": "1.0.0",
+  "settings": {
+    "theme": "medical",
+    "language": "en",
+    "apiEndpoint": "/api",
+    "features": {
+      "search": true,
+      "entityDetails": true,
+      "offlineMode": true
+    }
+  },
+  "ui": {
+    "showWelcomeMessage": true,
+    "welcomeMessage": "Welcome to the ICD-11 Medical Terminology Application. Search for diseases, conditions, and medical classifications.",
+    "searchPlaceholder": "Search for medical terms...",
+    "maxResults": 50
+  },
+  "integrations": {
+    "icd11": {
+      "enabled": true,
+      "apiVersion": "v2",
+      "language": "en"
+    }
+  }
+}

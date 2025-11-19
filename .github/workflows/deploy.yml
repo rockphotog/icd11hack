@@ -1,0 +1,154 @@
+name: Deploy ICD-11 Application
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Set up Node.js 18
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+    
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Install Node.js dependencies
+      run: |
+        npm install
+    
+    - name: Run Python tests
+      run: |
+        python -m pytest tests/ -v
+      continue-on-error: true
+    
+    - name: Run JavaScript tests
+      run: |
+        npm test
+      continue-on-error: true
+    
+    - name: Lint Python code
+      run: |
+        flake8 app/ --count --select=E9,F63,F7,F82 --show-source --statistics
+        black --check app/
+      continue-on-error: true
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Node.js 18
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+    
+    - name: Install dependencies
+      run: npm install
+    
+    - name: Build static assets
+      run: npm run build
+    
+    - name: Create static build
+      run: |
+        mkdir -p dist
+        cp -r static/* dist/
+        cp -r app/ dist/
+        cp requirements.txt dist/
+        cp package.json dist/
+        
+        # Create index.html for GitHub Pages
+        cat > dist/index.html << 'EOF'
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>ICD-11 Medical Terminology Application</title>
+            <link rel="stylesheet" href="css/style.css">
+        </head>
+        <body>
+            <div id="app">
+                <div class="container">
+                    <h1>ICD-11 Medical Terminology</h1>
+                    <p>Loading application...</p>
+                    <p><strong>Note:</strong> This is a static demo version. The full API functionality requires a backend server.</p>
+                </div>
+            </div>
+            <script src="js/app.js"></script>
+            <script>
+                // Override API calls for static version
+                window.app.searchICD11 = async function(query) {
+                    return {
+                        query: query,
+                        results: {
+                            destinationEntities: [
+                                {
+                                    title: "Demo Result for: " + query,
+                                    theCode: "DEMO.01",
+                                    definition: "This is a demo result. Configure ICD-11 API keys for full functionality."
+                                }
+                            ]
+                        }
+                    };
+                };
+            </script>
+        </body>
+        </html>
+        EOF
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: static-build
+        path: dist/
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    permissions:
+      pages: write
+      id-token: write
+    
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    
+    steps:
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: static-build
+        path: ./dist
+    
+    - name: Setup Pages
+      uses: actions/configure-pages@v3
+    
+    - name: Upload to GitHub Pages
+      uses: actions/upload-pages-artifact@v2
+      with:
+        path: ./dist
+    
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v2

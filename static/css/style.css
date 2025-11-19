@@ -1,0 +1,225 @@
+/* ICD-11 Hackathon Application Styles */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    line-height: 1.6;
+    color: #333;
+    background-color: #f8f9fa;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+h1, h2, h3 {
+    margin-bottom: 1rem;
+    color: #2c3e50;
+}
+
+h1 {
+    font-size: 2.5rem;
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+/* Search Interface */
+.search-container {
+    background: white;
+    border-radius: 8px;
+    padding: 2rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    margin-bottom: 2rem;
+}
+
+.search-form {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.search-input {
+    flex: 1;
+    padding: 12px 16px;
+    border: 2px solid #e1e8ed;
+    border-radius: 6px;
+    font-size: 16px;
+    transition: border-color 0.3s ease;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: #1da1f2;
+}
+
+.search-button {
+    padding: 12px 24px;
+    background-color: #1da1f2;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.search-button:hover {
+    background-color: #1991da;
+}
+
+.search-button:disabled {
+    background-color: #95a5a6;
+    cursor: not-allowed;
+}
+
+/* Results Display */
+.results-container {
+    background: white;
+    border-radius: 8px;
+    padding: 2rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.result-item {
+    border-bottom: 1px solid #e1e8ed;
+    padding: 1.5rem 0;
+    transition: background-color 0.3s ease;
+}
+
+.result-item:last-child {
+    border-bottom: none;
+}
+
+.result-item:hover {
+    background-color: #f8f9fa;
+    margin: 0 -1rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
+    border-radius: 6px;
+}
+
+.result-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 0.5rem;
+}
+
+.result-code {
+    font-family: 'Monaco', 'Consolas', monospace;
+    background-color: #ecf0f1;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    color: #e74c3c;
+    margin-bottom: 0.5rem;
+    display: inline-block;
+}
+
+.result-description {
+    color: #7f8c8d;
+    line-height: 1.5;
+}
+
+/* Loading States */
+.loading {
+    text-align: center;
+    padding: 2rem;
+    color: #95a5a6;
+}
+
+.spinner {
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #1da1f2;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Error States */
+.error {
+    background-color: #ffeaea;
+    border: 1px solid #e74c3c;
+    color: #c0392b;
+    padding: 1rem;
+    border-radius: 6px;
+    margin: 1rem 0;
+}
+
+/* Documentation Styles */
+.endpoint {
+    background-color: #f8f9fa;
+    border-left: 4px solid #1da1f2;
+    padding: 1rem;
+    margin: 1rem 0;
+    border-radius: 0 6px 6px 0;
+}
+
+.endpoint h3 {
+    color: #1da1f2;
+    font-family: 'Monaco', 'Consolas', monospace;
+    margin-bottom: 0.5rem;
+}
+
+.endpoint ul {
+    margin-left: 2rem;
+    margin-top: 0.5rem;
+}
+
+.endpoint li {
+    margin-bottom: 0.25rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .container {
+        padding: 10px;
+    }
+    
+    h1 {
+        font-size: 2rem;
+    }
+    
+    .search-form {
+        flex-direction: column;
+    }
+    
+    .search-button {
+        width: 100%;
+    }
+}
+
+/* OpenWebUI Integration Styles */
+.openwebui-container {
+    border: 1px solid #e1e8ed;
+    border-radius: 8px;
+    overflow: hidden;
+    height: 600px;
+    margin: 2rem 0;
+}
+
+.openwebui-header {
+    background-color: #2c3e50;
+    color: white;
+    padding: 1rem;
+    font-weight: 600;
+}
+
+.openwebui-content {
+    height: calc(100% - 60px);
+    background-color: white;
+}
