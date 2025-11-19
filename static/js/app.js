@@ -224,7 +224,9 @@ class ICD11App {
             searchButton.disabled = false;
             searchButton.textContent = 'Search';
         }
-    }    async searchICD11(query, flexiSearch = true, language = 'en') {
+    }
+
+    async searchICD11(query, flexiSearch = true, language = 'en') {
         const params = new URLSearchParams({
             q: query,
             flexisearch: flexiSearch.toString(),
@@ -246,7 +248,9 @@ class ICD11App {
             include_children: 'true'
         });
         
-        const response = await fetch(`${this.apiBaseUrl}/entity/${encodeURIComponent(entityId)}/details?${params}`);
+        // Don't double-encode the entity ID
+        const cleanEntityId = decodeURIComponent(entityId);
+        const response = await fetch(`${this.apiBaseUrl}/entity/${encodeURIComponent(cleanEntityId)}/details?${params}`);
         
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -260,7 +264,9 @@ class ICD11App {
             language: language
         });
         
-        const response = await fetch(`${this.apiBaseUrl}/entity/${encodeURIComponent(entityId)}/hierarchy?${params}`);
+        // Don't double-encode the entity ID
+        const cleanEntityId = decodeURIComponent(entityId);
+        const response = await fetch(`${this.apiBaseUrl}/entity/${encodeURIComponent(cleanEntityId)}/hierarchy?${params}`);
         
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -318,14 +324,14 @@ class ICD11App {
             const entityType = entity.entityType || 'Unknown';
             const important = entity.important ? '⭐' : '';
             
-            // Clean up title (remove HTML tags for display)
-            const cleanTitle = title.replace(/<[^>]*>/g, '');
+            // Clean up title (remove HTML tags for display but keep original for tooltips)
+            const cleanTitle = this.cleanHtmlTags(title);
             
             resultsHTML += `
                 <div class="result-item" data-index="${index}">
                     <div class="result-header">
                         <div class="result-title-section">
-                            <h3 class="result-title" title="${this.escapeHtml(cleanTitle)}">${title}</h3>
+                            <h3 class="result-title" title="${this.escapeHtml(cleanTitle)}">${this.escapeHtml(cleanTitle)}</h3>
                             <span class="result-importance">${important}</span>
                         </div>
                         <div class="result-code-section">
@@ -386,8 +392,18 @@ class ICD11App {
     }
 
     async showEntityDetails(entityId) {
-        if (!entityId) {
-            console.error('No entity ID provided');
+        console.log('Showing details for entity with ID:', entityId);
+        
+        // Find the entity in current search results instead of making API call
+        if (!this.currentSearchResults || !this.currentSearchResults.results) {
+            alert('No search results available. Please search first.');
+            return;
+        }
+
+        const entity = this.currentSearchResults.results.destinationEntities.find(e => e.id === entityId);
+        
+        if (!entity) {
+            alert('Entity not found in current search results.');
             return;
         }
 
@@ -397,24 +413,85 @@ class ICD11App {
         
         if (!detailContainer || !detailContent) return;
 
-        try {
-            // Show loading state
-            detailContainer.style.display = 'block';
-            resultsContainer.style.display = 'none';
-            detailContent.innerHTML = this.createLoadingHTML();
+        // Show details using data we already have
+        detailContainer.style.display = 'block';
+        resultsContainer.style.display = 'none';
+        
+        this.displayBasicEntityDetails({ data: entity });
+    }
 
-            // Fetch entity details and hierarchy
-            const [details, hierarchy] = await Promise.all([
-                this.getEntityDetails(entityId, this.selectedLanguage),
-                this.getEntityHierarchy(entityId, this.selectedLanguage)
-            ]);
+    displayBasicEntityDetails(entityData) {
+        const detailContent = document.getElementById('entityDetailContent');
+        if (!detailContent) return;
 
-            this.displayEntityDetails(details, hierarchy);
+        const entity = entityData.data || entityData;
 
-        } catch (error) {
-            console.error('Error loading entity details:', error);
-            detailContent.innerHTML = this.createErrorHTML(`Failed to load entity details: ${error.message}`);
-        }
+        let html = `
+            <div class="entity-detail">
+                <div class="entity-header">
+                    <h3>${this.cleanHtmlTags(entity.title || entity.label || 'No title')}</h3>
+                    <div class="entity-codes">
+                        ${entity.theCode || entity.code ? `<span class="main-code">ICD-11: ${this.escapeHtml(entity.theCode || entity.code)}</span>` : ''}
+                        ${entity.id ? `<span class="entity-id">ID: ${this.escapeHtml(entity.id)}</span>` : ''}
+                    </div>
+                </div>
+
+                <div class="entity-content">
+                    ${entity.definition || entity.longDefinition ? `
+                        <div class="entity-section">
+                            <h4>Definition</h4>
+                            <p>${this.escapeHtml(entity.definition || entity.longDefinition || 'No definition available')}</p>
+                        </div>
+                    ` : ''}
+
+                    <div class="entity-section">
+                        <h4>Entity Information</h4>
+                        <div class="entity-metadata">
+                            ${entity.chapter ? `<p><strong>Chapter:</strong> ${this.escapeHtml(entity.chapter)}</p>` : ''}
+                            ${entity.entityType ? `<p><strong>Type:</strong> ${this.escapeHtml(entity.entityType)}</p>` : ''}
+                            ${entity.score !== undefined ? `<p><strong>Relevance Score:</strong> ${entity.score.toFixed(2)}</p>` : ''}
+                            ${entity.isLeaf !== undefined ? `<p><strong>Status:</strong> ${entity.isLeaf ? 'Leaf node (no subcategories)' : 'Has subcategories'}</p>` : ''}
+                            ${entity.blockId ? `<p><strong>Block ID:</strong> ${this.escapeHtml(entity.blockId)}</p>` : ''}
+                            ${entity.stemId ? `<p><strong>Stem ID:</strong> ${this.escapeHtml(entity.stemId)}</p>` : ''}
+                            ${entity.important ? `<p><strong>Important:</strong> ⭐ Yes</p>` : ''}
+                        </div>
+                    </div>
+
+                    ${entity.descendants && entity.descendants.length > 0 ? `
+                        <div class="entity-section">
+                            <h4>Related Entities (${entity.descendants.length})</h4>
+                            <ul class="hierarchy-list">
+                                ${entity.descendants.slice(0, 10).map(desc => {
+                                    const cleanTitle = this.cleanHtmlTags(desc.title || desc.label || 'Related entity');
+                                    const searchTerm = desc.theCode || cleanTitle;
+                                    return `
+                                    <li class="hierarchy-link" onclick="window.app.performNewSearch('${this.escapeHtml(searchTerm)}')"
+                                        style="cursor: pointer; padding: 8px; margin: 2px 0; background: #f8f9fa; border-radius: 4px; transition: background-color 0.2s;" 
+                                        onmouseover="this.style.backgroundColor='#e9ecef'" 
+                                        onmouseout="this.style.backgroundColor='#f8f9fa'">
+                                        ${this.escapeHtml(cleanTitle)}
+                                        ${desc.theCode ? `<span class="code">(${this.escapeHtml(desc.theCode)})</span>` : ''}
+                                        <span style="font-size: 12px; color: #6c757d; margin-left: 8px;">🔍 Click to search</span>
+                                    </li>
+                                `;
+                                }).join('')}
+                                ${entity.descendants.length > 10 ? `<li class="more-items">... and ${entity.descendants.length - 10} more</li>` : ''}
+                            </ul>
+                        </div>
+                    ` : ''}
+
+                    <div class="entity-section">
+                        <h4>Raw Data (for debugging)</h4>
+                        <details>
+                            <summary>Click to view raw JSON</summary>
+                            <pre style="background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto; font-size: 12px;">${JSON.stringify(entity, null, 2)}</pre>
+                        </details>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        detailContent.innerHTML = html;
     }
 
     displayEntityDetails(details, hierarchy) {
@@ -509,21 +586,45 @@ class ICD11App {
             resultsContent.innerHTML = this.createErrorHTML(message);
         }
     }
-            const entity = await this.getEntity(entityId);
-            console.log('Entity details:', entity);
-            // TODO: Implement detailed entity view
-            alert(`Entity details loaded. Check console for full data.`);
-        } catch (error) {
-            console.error('Error loading entity:', error);
-            alert(`Failed to load entity details: ${error.message}`);
-        }
-    }
 
     escapeHtml(text) {
         if (typeof text !== 'string') return '';
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+    
+    cleanHtmlTags(text) {
+        if (!text || typeof text !== 'string') return '';
+        return text.replace(/<[^>]*>/g, '').trim();
+    }
+    
+    async performNewSearch(searchTerm) {
+        try {
+            // Clear current results and show loading
+            const searchInput = document.getElementById('searchInput');
+            const resultsDiv = document.getElementById('results');
+            
+            if (searchInput) {
+                searchInput.value = searchTerm;
+            }
+            
+            if (resultsDiv) {
+                resultsDiv.innerHTML = '<div class="loading">Searching...</div>';
+            }
+            
+            // Scroll to top
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            
+            // Perform the search
+            await this.search(searchTerm);
+        } catch (error) {
+            console.error('Error performing new search:', error);
+            const resultsDiv = document.getElementById('results');
+            if (resultsDiv) {
+                resultsDiv.innerHTML = `<div class="error">Search failed: ${error.message}</div>`;
+            }
+        }
     }
 
     // OpenWebUI integration methods
