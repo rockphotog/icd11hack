@@ -13,8 +13,14 @@ class ICD11App {
     }
 
     init() {
-        this.setupEventListeners();
+        console.log('ICD-11 Application starting...');
         this.setupUI();
+        
+        // Set up event listeners after UI is created
+        setTimeout(() => {
+            this.setupEventListeners();
+        }, 100);
+        
         this.loadSupportedLanguages();
         console.log('ICD-11 Application initialized');
     }
@@ -113,28 +119,50 @@ class ICD11App {
     }
 
     setupEventListeners() {
-        document.addEventListener('DOMContentLoaded', () => {
+        // Set up event listeners immediately since DOM is already loaded
+        const addEventListeners = () => {
+            console.log('Setting up event listeners...');
             const searchForm = document.getElementById('searchForm');
             if (searchForm) {
+                console.log('Search form found, adding submit listener');
                 searchForm.addEventListener('submit', (e) => this.handleSearch(e));
+            } else {
+                console.error('Search form not found!');
             }
             
             const languageSelect = document.getElementById('languageSelect');
             if (languageSelect) {
+                console.log('Language select found, adding change listener');
                 languageSelect.addEventListener('change', (e) => {
                     this.selectedLanguage = e.target.value;
                     console.log('Language changed to:', this.selectedLanguage);
                 });
+            } else {
+                console.error('Language select not found!');
             }
             
             const backButton = document.getElementById('backToResults');
             if (backButton) {
+                console.log('Back button found, adding click listener');
                 backButton.addEventListener('click', () => this.showSearchResults());
+            } else {
+                console.log('Back button not found (this is normal on initial load)');
             }
-        });
+        };
+
+        // Check if DOM is already loaded
+        if (document.readyState === 'loading') {
+            console.log('DOM still loading, waiting for DOMContentLoaded');
+            document.addEventListener('DOMContentLoaded', addEventListeners);
+        } else {
+            // DOM is already loaded, set up listeners immediately
+            console.log('DOM already loaded, setting up listeners immediately');
+            addEventListeners();
+        }
     }
 
     async handleSearch(event) {
+        console.log('Search triggered!', event);
         event.preventDefault();
         
         const searchInput = document.getElementById('searchInput');
@@ -145,6 +173,14 @@ class ICD11App {
         const resultsContent = document.getElementById('resultsContent');
         const resultsMeta = document.getElementById('resultsMeta');
 
+        console.log('Search elements found:', {
+            searchInput: !!searchInput,
+            flexiSearch: !!flexiSearch,
+            languageSelect: !!languageSelect,
+            searchButton: !!searchButton,
+            resultsContainer: !!resultsContainer
+        });
+
         if (!searchInput || !searchInput.value.trim()) {
             alert('Please enter a search term');
             return;
@@ -153,7 +189,9 @@ class ICD11App {
         const query = searchInput.value.trim();
         const useFlexiSearch = flexiSearch ? flexiSearch.checked : true;
         const language = languageSelect ? languageSelect.value : this.selectedLanguage;
-
+        
+        console.log('Search parameters:', { query, useFlexiSearch, language });
+        
         // Show loading state
         searchButton.disabled = true;
         searchButton.textContent = 'Searching...';
@@ -161,10 +199,15 @@ class ICD11App {
         resultsContent.innerHTML = this.createLoadingHTML();
         
         // Hide entity details if showing
-        document.getElementById('entityDetailContainer').style.display = 'none';
+        const entityDetailContainer = document.getElementById('entityDetailContainer');
+        if (entityDetailContainer) {
+            entityDetailContainer.style.display = 'none';
+        }
 
         try {
+            console.log('Making API call...');
             const results = await this.searchICD11(query, useFlexiSearch, language);
+            console.log('Search results received:', results);
             this.currentSearchResults = results;
             this.displayResults(results);
             
@@ -181,9 +224,7 @@ class ICD11App {
             searchButton.disabled = false;
             searchButton.textContent = 'Search';
         }
-    }
-
-    async searchICD11(query, flexiSearch = true, language = 'en') {
+    }    async searchICD11(query, flexiSearch = true, language = 'en') {
         const params = new URLSearchParams({
             q: query,
             flexisearch: flexiSearch.toString(),
