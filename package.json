@@ -4,7 +4,7 @@
   "description": "ICD-11 medical terminology application with OpenWebUI",
   "main": "index.js",
   "scripts": {
-    "dev": "node server.js",
+    "dev": "http-server static -p 9000 --cors",
     "build": "webpack --mode production",
     "build-dev": "webpack --mode development",
     "watch": "webpack --mode development --watch",
