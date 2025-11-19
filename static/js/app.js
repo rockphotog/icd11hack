@@ -8,6 +8,7 @@ class ICD11App {
         // Use the backend server URL for API calls
         this.apiBaseUrl = 'http://localhost:8000/api';
         this.selectedLanguage = 'en';
+        this.currentSearchType = 'mms'; // Default to MMS (Official Medical Codes)
         this.searchHistory = [];
         this.init();
     }
@@ -71,7 +72,7 @@ class ICD11App {
                             type="text" 
                             class="search-input" 
                             id="searchInput" 
-                            placeholder="Search for medical terms, diseases, or conditions..."
+                            placeholder="Search official ICD-11 codes (e.g. 5A13.4) or medical conditions..."
                             required
                         />
                         <button type="submit" class="search-button" id="searchButton">
@@ -94,6 +95,22 @@ class ICD11App {
                                 <option value="no">Norwegian (upcoming)</option>
                                 <option value="nb">Norwegian Bokmål (upcoming)</option>
                                 <option value="nn">Norwegian Nynorsk (upcoming)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="option-group">
+                            <label>
+                                <input type="checkbox" id="mmsSearch" checked>
+                                🏥 MMS (Official Medical Codes)
+                            </label>
+                        </div>
+                        
+                        <div class="option-group" id="releaseSelectContainer" style="display: block;">
+                            <label for="releaseSelect">Release:</label>
+                            <select id="releaseSelect" class="release-select">
+                                <option value="2025-01">2025-01 (Latest)</option>
+                                <option value="2024-01">2024-01</option>
+                                <option value="2023-01">2023-01</option>
                             </select>
                         </div>
                     </div>
@@ -139,6 +156,17 @@ class ICD11App {
                 });
             } else {
                 console.error('Language select not found!');
+            }
+            
+            // MMS search toggle
+            const mmsCheckbox = document.getElementById('mmsSearch');
+            const releaseContainer = document.getElementById('releaseSelectContainer');
+            if (mmsCheckbox && releaseContainer) {
+                console.log('MMS checkbox found, adding change listener');
+                mmsCheckbox.addEventListener('change', (e) => {
+                    releaseContainer.style.display = e.target.checked ? 'block' : 'none';
+                    console.log('MMS mode:', e.target.checked ? 'enabled' : 'disabled');
+                });
             }
             
             const backButton = document.getElementById('backToResults');
@@ -227,19 +255,41 @@ class ICD11App {
     }
 
     async searchICD11(query, flexiSearch = true, language = 'en') {
+        // Check if MMS search is enabled
+        const mmsCheckbox = document.getElementById('mmsSearch');
+        const useMMS = mmsCheckbox ? mmsCheckbox.checked : false;
+        const release = document.getElementById('releaseSelect')?.value || '2025-01';
+        
+        // Use enhanced search endpoint that handles both text and codes
         const params = new URLSearchParams({
             q: query,
-            flexisearch: flexiSearch.toString(),
-            language: language
+            search_type: useMMS ? 'mms' : 'foundation',
+            release: release,
+            language: language,
+            flexisearch: flexiSearch.toString()
         });
         
-        const response = await fetch(`${this.apiBaseUrl}/search?${params}`);
+        const endpoint = 'search/enhanced';
+        this.currentSearchType = useMMS ? 'mms' : 'foundation';
+        
+        console.log(`Using enhanced search: ${useMMS ? 'MMS' : 'Foundation'} mode`);
+        console.log('Query:', query, 'Release:', release);
+        
+        const response = await fetch(`${this.apiBaseUrl}/${endpoint}?${params}`);
         
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
         
-        return await response.json();
+        const result = await response.json();
+        console.log('Enhanced search result:', result);
+        
+        // Check if this was a code search
+        if (result.query_type === 'code') {
+            console.log('Code search detected for:', result.original_query);
+        }
+        
+        return result;
     }
 
     async getEntityDetails(entityId, language = 'en') {
@@ -302,13 +352,28 @@ class ICD11App {
         
         // Update meta information
         if (resultsMeta) {
+            const isMMS = this.currentSearchType === 'mms';
             const languageInfo = data.fallback_used ? 
                 `<span class="language-fallback">⚠️ Norwegian not available yet, showing English results</span>` :
                 `<span class="language-used">Language: ${data.language_used ? data.language_used.toUpperCase() : 'EN'}</span>`;
             
+            let searchInfo = '';
+            if (data.query_type === 'code') {
+                searchInfo = `<span class="code-search-info">🔍 Code Search: "${data.original_query}"</span>`;
+            }
+            
+            let mmsInfo = '';
+            if (isMMS) {
+                mmsInfo = `<span class="mms-info">🏥 MMS Release: ${data.release || '2025-01'} (Official Medical Codes)</span>`;
+            } else {
+                mmsInfo = `<span class="foundation-info">📚 Foundation Component</span>`;
+            }
+            
             resultsMeta.innerHTML = `
                 <div class="results-info">
                     <span class="result-count">${entities.length} results found</span>
+                    ${searchInfo}
+                    ${mmsInfo}
                     ${languageInfo}
                 </div>
             `;
@@ -323,19 +388,25 @@ class ICD11App {
             const score = entity.score || 0;
             const entityType = entity.entityType || 'Unknown';
             const important = entity.important ? '⭐' : '';
+            const isMMS = this.currentSearchType === 'mms';
             
             // Clean up title (remove HTML tags for display but keep original for tooltips)
             const cleanTitle = this.cleanHtmlTags(title);
             
             resultsHTML += `
-                <div class="result-item" data-index="${index}">
+                <div class="result-item ${isMMS ? 'mms-result' : 'foundation-result'}" data-index="${index}">
                     <div class="result-header">
                         <div class="result-title-section">
                             <h3 class="result-title" title="${this.escapeHtml(cleanTitle)}">${this.escapeHtml(cleanTitle)}</h3>
                             <span class="result-importance">${important}</span>
+                            <span class="code-type-badge ${isMMS ? 'mms-badge' : 'foundation-badge'}">
+                                ${isMMS ? '✓ MMS Official' : 'Foundation'}
+                            </span>
                         </div>
                         <div class="result-code-section">
-                            <span class="icd-code">${this.escapeHtml(icdCode)}</span>
+                            <span class="icd-code ${isMMS ? 'official-code' : 'foundation-code'}">
+                                ${isMMS ? '🏥' : '📋'} ${this.escapeHtml(icdCode)}
+                            </span>
                             <span class="result-score">Score: ${score.toFixed(2)}</span>
                         </div>
                     </div>

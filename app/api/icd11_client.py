@@ -182,9 +182,160 @@ class ICD11Client:
             else:
                 raise e
     
+    async def enhanced_search(self, query: str, search_type: str = "mms", release: str = "2025-01", language: str = "en", use_flexisearch: bool = True) -> Dict[Any, Any]:
+        """Enhanced search that detects if query is a code and searches appropriately"""
+        # Detect if query looks like an ICD-11 code
+        is_code_query = self._is_icd_code(query)
+        
+        if is_code_query:
+            # Search by specific code
+            result = await self.search_by_code(query, release, language, search_type)
+            return {
+                "results": result,
+                "search_method": "code_search",
+                "query_type": "code",
+                "original_query": query
+            }
+        else:
+            # Regular text search
+            if search_type == "mms":
+                result = await self.search_mms(query, release, language, use_flexisearch)
+            else:
+                result = await self.search_entities(query, use_flexisearch, language)
+            return {
+                "results": result,
+                "search_method": "text_search",
+                "query_type": "text",
+                "original_query": query
+            }
+    
+    def _is_icd_code(self, query: str) -> bool:
+        """Detect if query looks like an ICD-11 code"""
+        import re
+        # ICD-11 patterns:
+        # MMS codes: 5A10, 5A13.4, 1A00.0, etc.
+        # Foundation IDs: longer alphanumeric strings
+        # URI format: http://id.who.int/icd/entity/...
+        
+        query = query.strip()
+        
+        # Check for URI format
+        if query.startswith("http://id.who.int/icd/"):
+            return True
+            
+        # Check for MMS code patterns (e.g., 5A10, 1A00.0, 5A13.4)
+        mms_pattern = r'^[0-9][A-Z][0-9]{1,2}(\.[0-9A-Z]{1,3})?$'
+        if re.match(mms_pattern, query):
+            return True
+            
+        # Check for Foundation stem IDs (typically longer numbers)
+        if query.isdigit() and len(query) > 6:
+            return True
+            
+        return False
+    
     async def get_foundation_entities(self, language: str = "en") -> Dict[Any, Any]:
         """Get foundation entities from ICD-11"""
         endpoint = f"release/11/2023-01/mms/en"
+        return await self._make_request(endpoint)
+    
+    async def get_mms_entities(self, release: str = "2025-01", language: str = "en") -> Dict[Any, Any]:
+        """Get MMS (Mortality and Morbidity Statistics) linearization entities"""
+        endpoint = f"release/11/{release}/mms/{language}"
+        return await self._make_request(endpoint)
+    
+    async def search_mms(self, query: str, release: str = "2025-01", language: str = "en", use_flexisearch: bool = True) -> Dict[Any, Any]:
+        """Search within MMS linearization for official medical codes"""
+        endpoint = f"release/11/{release}/mms/search"
+        params = {
+            "q": query,
+            "flatResults": "false",
+            "useFlexisearch": str(use_flexisearch).lower()
+        }
+        
+        headers = {
+            "Authorization": f"Bearer {self.access_token or await self.get_access_token()}",
+            "Accept": "application/json",
+            "API-Version": "v2",
+            "Accept-Language": language
+        }
+        
+        url = f"{self.base_url}/{endpoint}"
+        response = await self.client.get(url, headers=headers, params=params)
+        response.raise_for_status()
+        
+        return response.json()
+    
+    async def search_by_code(self, code: str, release: str = "2025-01", language: str = "en", search_type: str = "mms") -> Dict[Any, Any]:
+        """Search for ICD-11 entities by specific code (e.g., '6A05', '5A13.4')"""
+        if search_type == "mms":
+            # For MMS, try exact search first, then flexible search
+            endpoint = f"release/11/{release}/mms/search"
+            
+            # Try exact search first
+            exact_params = {
+                "q": code,
+                "flatResults": "false",
+                "useFlexisearch": "false",
+                "includeKeywordResult": "true"
+            }
+            
+            headers = {
+                "Authorization": f"Bearer {self.access_token or await self.get_access_token()}",
+                "Accept": "application/json",
+                "API-Version": "v2",
+                "Accept-Language": language
+            }
+            
+            url = f"{self.base_url}/{endpoint}"
+            
+            # Try exact search first
+            exact_response = await self.client.get(url, headers=headers, params=exact_params)
+            exact_response.raise_for_status()
+            exact_results = exact_response.json()
+            
+            # If exact search finds results, return them
+            if exact_results.get('destinationEntities') and len(exact_results['destinationEntities']) > 0:
+                return exact_results
+            
+            # Otherwise, try flexible search
+            flex_params = {
+                "q": code,
+                "flatResults": "false",
+                "useFlexisearch": "true",
+                "includeKeywordResult": "true"
+            }
+            
+            flex_response = await self.client.get(url, headers=headers, params=flex_params)
+            flex_response.raise_for_status()
+            return flex_response.json()
+            
+        else:
+            # Search in Foundation by stemId or code
+            endpoint = "entity/search"
+            params = {
+                "q": code,
+                "flatResults": "false",
+                "useFlexisearch": "true",
+                "fieldFilter": "theCode,stemId"
+            }
+            
+            headers = {
+                "Authorization": f"Bearer {self.access_token or await self.get_access_token()}",
+                "Accept": "application/json",
+                "API-Version": "v2",
+                "Accept-Language": language
+            }
+            
+            url = f"{self.base_url}/{endpoint}"
+            response = await self.client.get(url, headers=headers, params=params)
+            response.raise_for_status()
+            
+            return response.json()
+    
+    async def get_mms_entity(self, entity_id: str, release: str = "2025-01", language: str = "en") -> Dict[Any, Any]:
+        """Get specific entity from MMS linearization"""
+        endpoint = f"release/11/{release}/mms/{language}/{entity_id}"
         return await self._make_request(endpoint)
     
     async def close(self):
