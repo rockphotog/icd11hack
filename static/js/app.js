@@ -175,14 +175,8 @@ class ICD11App {
             }
             
         } catch (error) {
-            this.displayError('Search failed: ' + error.message);
-        } finally {
-            searchButton.disabled = false;
-            searchButton.textContent = 'Search';
-        }
-    }
             console.error('Search error:', error);
-            resultsContent.innerHTML = this.createErrorHTML(error.message);
+            this.displayError('Search failed: ' + error.message);
         } finally {
             searchButton.disabled = false;
             searchButton.textContent = 'Search';
