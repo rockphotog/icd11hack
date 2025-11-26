@@ -81,31 +81,34 @@ async def enhanced_search(
             else:
                 # If no exact matches found, try fallback text searches
                 fallback_searches = [
-                    f"{q}",  # Search for the code as text
                     f"diabetes {q}",  # Try with diabetes context
-                    "type 1 diabetes",  # Try broad diabetes search for 5A10
                     f"endocrine {q}",  # Try with endocrine context
                 ]
                 
                 for search_term in fallback_searches:
-                    text_result = await icd11_client.search_mms(
-                        search_term, release, language, True
-                    )
-                    if text_result.get("destinationEntities"):
-                        # Find entities with matching codes in text search
-                        for entity in text_result["destinationEntities"]:
-                            if entity.get("theCode") == query_code:
-                                # Prepend exact match from text search
-                                result["results"]["destinationEntities"].insert(
-                                    0, entity
-                                )
-                                result["exact_matches_found"] = 1
-                                result["fallback_search_used"] = True
-                                result["fallback_search_term"] = search_term
-                                # Found a match, break out of both loops
-                                break
-                    if result.get("fallback_search_used"):
-                        break
+                    try:
+                        text_result = await icd11_client.search_mms(
+                            search_term, release, language, True
+                        )
+                        if text_result.get("destinationEntities"):
+                            # Find entities with matching codes
+                            for entity in text_result["destinationEntities"]:
+                                if entity.get("theCode") == query_code:
+                                    # Prepend exact match from text search
+                                    result["results"]["destinationEntities"].insert(
+                                        0, entity
+                                    )
+                                    result["exact_matches_found"] = 1
+                                    result["fallback_search_used"] = True
+                                    result["fallback_search_term"] = search_term
+                                    # Found a match, break out
+                                    break
+                        if result.get("fallback_search_used"):
+                            break
+                    except Exception as e:
+                        # Log and continue to next fallback search
+                        print(f"Fallback search error for '{search_term}': {e}")
+                        continue
         
         return {
             "query": q,
