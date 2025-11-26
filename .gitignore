@@ -79,3 +79,4 @@ temp/
 # Build outputs
 static/js/bundle.js
 static/css/bundle.css
+nohup.out
